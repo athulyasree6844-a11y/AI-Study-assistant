@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Summarize PDF</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            color: white;
+        }
+
+        .card {
+            width: 100%;
+            max-width: 600px;
+            padding: 45px;
+            border-radius: 25px;
+            background: rgba(255,255,255,0.08);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 35px;
+            background: linear-gradient(to right, #00f5ff, #00ffcc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .upload-box {
+            border: 2px dashed rgba(255,255,255,0.4);
+            padding: 30px;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: 0.3s;
+            display: block;
+            margin-bottom: 25px;
+        }
+
+        .upload-box:hover { border-color: #00ffcc; background: rgba(255,255,255,0.05); }
+
+        input[type="file"] { display: none; }
+
+        .generate-btn {
+            padding: 14px 40px;
+            border-radius: 30px;
+            border: none;
+            background: linear-gradient(45deg, #00f5ff, #00ffcc);
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            color: #002;
+        }
+
+        .generate-btn:hover { transform: scale(1.08); box-shadow: 0 0 20px #00ffcc; }
+        .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .spinner {
+            display: none;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(0,255,204,0.2);
+            border-top-color: #00ffcc;
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+            margin: 25px auto 10px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .loading-text { display: none; color: #9ecdc6; font-size: 13px; margin-bottom: 10px; }
+
+        .result {
+            margin-top: 25px;
+            padding: 22px;
+            border-radius: 15px;
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.1);
+            text-align: left;
+            font-size: 14px;
+            line-height: 1.8;
+            color: #cce8e2;
+            display: none;
+        }
+
+        .result h3 {
+            color: #00ffcc;
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+
+        .error-box {
+            margin-top: 20px;
+            background: rgba(90,30,30,0.5);
+            border: 1px solid #7a2a2a;
+            color: #ffdede;
+            padding: 14px 18px;
+            border-radius: 12px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .back { display: block; margin-top: 25px; color: #00ffcc; text-decoration: none; font-size: 14px; }
+    </style>
+</head>
+
+<body>
+<div class="card">
+    <h1>📄 Summarize PDF</h1>
+
+    <label class="upload-box" for="fileInput">
+        <span id="uploadText">📂 Click to Upload PDF</span>
+    </label>
+    <input type="file" id="fileInput" accept=".pdf" onchange="updateUploadText()">
+
+    <button class="generate-btn" id="summarizeBtn" onclick="generateSummary()">Generate Summary</button>
+
+    <div class="spinner" id="spinner"></div>
+    <div class="loading-text" id="loadingText">Summarizing your document...</div>
+
+    <div class="error-box" id="errorBox"></div>
+
+    <div class="result" id="resultBox">
+        <h3>📝 Summary</h3>
+        <div id="summaryText"></div>
+    </div>
+
+    <a href="option.html" class="back">⬅ Back</a>
+</div>
+
+<script>
+    function updateUploadText() {
+        const fileInput = document.getElementById("fileInput");
+        if (fileInput.files.length > 0) {
+            document.getElementById("uploadText").textContent = "📄 " + fileInput.files[0].name;
+        }
+    }
+
+    function showError(msg) {
+        const box = document.getElementById("errorBox");
+        box.textContent = msg;
+        box.style.display = "block";
+    }
+
+    function hideError() {
+        document.getElementById("errorBox").style.display = "none";
+    }
+
+    async function generateSummary() {
+        hideError();
+
+        const fileInput = document.getElementById("fileInput");
+        if (fileInput.files.length === 0) {
+            alert("Please upload a PDF first.");
+            return;
+        }
+
+        const btn = document.getElementById("summarizeBtn");
+        const spinner = document.getElementById("spinner");
+        const loadingText = document.getElementById("loadingText");
+        const resultBox = document.getElementById("resultBox");
+
+        btn.disabled = true;
+        spinner.style.display = "block";
+        loadingText.style.display = "block";
+        resultBox.style.display = "none";
+
+        const formData = new FormData();
+        formData.append("pdf", fileInput.files[0]);
+
+        try {
+            const response = await fetch("http://127.0.0.1:5000/summarize", {
+                method: "POST",
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            document.getElementById("summaryText").innerText = data.summary;
+            resultBox.style.display = "block";
+
+        } catch (err) {
+            showError("❌ " + (err.message || "Something went wrong. Please try again."));
+        } finally {
+            btn.disabled = false;
+            spinner.style.display = "none";
+            loadingText.style.display = "none";
+        }
+    }
+</script>
+
+</body>
+</html>

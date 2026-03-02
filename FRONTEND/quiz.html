@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quiz</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Poppins', sans-serif; }
+        body { min-height:100vh; background: linear-gradient(135deg,#0f2027,#203a43,#2c5364); display:flex; align-items:center; justify-content:center; padding:20px; color:#fff }
+        .card { width:100%; max-width:800px; padding:30px; border-radius:18px; background: rgba(255,255,255,0.06); backdrop-filter: blur(12px); box-shadow: 0 12px 30px rgba(0,0,0,0.5) }
+        h1 { text-align:center; margin-bottom:18px; font-size:28px; background: linear-gradient(90deg,#00f5ff,#00ffcc); -webkit-background-clip:text; background-clip: text; -webkit-text-fill-color:transparent }
+        .meta { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:14px; color:#cfeeea }
+        .question { margin:18px 0; font-size:16px; white-space:pre-line }
+        .options { display:flex; flex-direction:column; gap:10px; margin-top:8px }
+        .option-btn { text-align:left; padding:12px 14px; border-radius:10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.04); color:#e7fff7; cursor:pointer; transition: all .15s; }
+        .option-btn:hover { transform: translateY(-2px) }
+        .option-btn.correct { background: #0f5132; border-color: #0f5132; color: #bfffe0 }
+        .option-btn.wrong { background: #5a1f1f; border-color:#7a2a2a; color:#ffdede }
+        .feedback { margin-top:12px; font-size:15px; min-height:22px }
+        .controls { display:flex; justify-content:space-between; align-items:center; margin-top:18px }
+        .nav { display:flex; gap:12px }
+        .btn { padding:10px 14px; border-radius:10px; background:#00bfa5; color:#002; font-weight:600; cursor:pointer; border:none }
+        .btn:disabled { opacity:0.45; cursor:not-allowed }
+        .small { background:transparent; color:#9ff; border:1px solid rgba(255,255,255,0.06); padding:8px 10px }
+        .score { font-weight:700; color:#cfeeea }
+        .back { display:inline-block; margin-top:18px; text-decoration:none; color:#9ff }
+        .center { text-align:center }
+    </style>
+</head>
+<body>
+
+<div class="card" id="card">
+    <h1>Generated Quiz</h1>
+
+    <div class="meta">
+        <div id="progress">Question 0 / 0</div>
+        <div class="score">Score: <span id="score">0</span></div>
+    </div>
+
+    <div id="questionArea">
+        <div class="question" id="questionText">Loading...</div>
+        <div class="options" id="options"></div>
+        <div class="feedback" id="feedback"></div>
+    </div>
+
+    <div class="controls">
+        <div class="nav">
+            <button class="btn" id="prevBtn">◀ Prev</button>
+            <button class="btn" id="nextBtn">Next ▶</button>
+        </div>
+        <div>
+            <button class="small" id="resetBtn">Reset Answers</button>
+            <a class="back" href="level.html">⬅ Generate Another Quiz</a>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    const raw = localStorage.getItem('generatedQuiz');
+    let quiz = null;
+
+    try {
+        quiz = raw ? JSON.parse(raw) : null;
+    } catch (e) {
+        // If stored as a stringified JSON inside a string, try once more
+        try { quiz = JSON.parse(JSON.parse(raw)); } catch (e2) { quiz = null }
+    }
+
+    const qCount = Array.isArray(quiz) ? quiz.length : 0;
+    const progressEl = document.getElementById('progress');
+    const questionText = document.getElementById('questionText');
+    const optionsEl = document.getElementById('options');
+    const feedbackEl = document.getElementById('feedback');
+    const scoreEl = document.getElementById('score');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    if (!quiz || qCount === 0) {
+        questionText.innerText = 'No quiz found. Please generate again.';
+        optionsEl.innerHTML = '';
+        progressEl.innerText = 'Question 0 / 0';
+        prevBtn.disabled = true; nextBtn.disabled = true; resetBtn.disabled = true;
+        return;
+    }
+
+    // normalize items: ensure {question, options:[], answer}
+    quiz = quiz.map(item => ({
+        question: (item.question || item.q || '').toString().trim(),
+        options: Array.isArray(item.options) ? item.options.map(String) : (item.options ? [String(item.options)] : []),
+        answer: (item.answer || '').toString()
+    }));
+
+    let index = 0;
+    const userAnswers = new Array(qCount).fill(null); // stores selected option index
+
+    function render() {
+        const q = quiz[index];
+        progressEl.innerText = `Question ${index+1} / ${qCount}`;
+        questionText.innerText = q.question || '(no question text)';
+        optionsEl.innerHTML = '';
+        feedbackEl.innerText = '';
+
+        q.options.forEach((opt, i) => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.type = 'button';
+            btn.innerText = opt;
+            btn.dataset.index = i;
+            btn.addEventListener('click', () => selectOption(i));
+            optionsEl.appendChild(btn);
+        });
+
+        // if previously answered, show feedback and highlight
+        const prev = userAnswers[index];
+        if (prev !== null) applyAnswer(prev, false);
+
+        prevBtn.disabled = index === 0;
+        nextBtn.disabled = index === qCount - 1;
+        scoreEl.innerText = computeScore();
+    }
+
+    function normalizeText(s) {
+        return (s||'').replace(/\s+/g,' ').trim();
+    }
+
+    function selectOption(optIndex) {
+        if (userAnswers[index] !== null) return; // already answered
+        userAnswers[index] = optIndex;
+        applyAnswer(optIndex, true);
+        scoreEl.innerText = computeScore();
+    }
+
+    function applyAnswer(optIndex, showToast) {
+        const q = quiz[index];
+        const buttons = Array.from(optionsEl.children);
+        const selectedBtn = buttons[optIndex];
+        const chosenText = selectedBtn ? selectedBtn.innerText : '';
+        const answerText = q.answer || '';
+
+        // find correct button(s) by matching normalized text
+        let correctIndex = -1;
+        buttons.forEach((b, i) => {
+            if (normalizeText(b.innerText) === normalizeText(answerText)) correctIndex = i;
+            b.disabled = true;
+            b.classList.remove('correct','wrong');
+        });
+
+        if (correctIndex >= 0) {
+            buttons[correctIndex].classList.add('correct');
+        }
+
+        if (normalizeText(chosenText) === normalizeText(answerText)) {
+            if (selectedBtn) selectedBtn.classList.add('correct');
+            feedbackEl.style.color = '#bfffe0';
+            feedbackEl.innerText = 'Correct ✓';
+        } else {
+            if (selectedBtn) selectedBtn.classList.add('wrong');
+            feedbackEl.style.color = '#ffdede';
+            feedbackEl.innerText = 'Wrong ✗ — Correct answer: ' + (answerText || '(not provided)');
+        }
+
+        if (showToast) {
+            // small visual pulse
+            feedbackEl.style.opacity = '0';
+            setTimeout(()=> feedbackEl.style.opacity = '1', 10);
+        }
+    }
+
+    function computeScore() {
+        let s = 0;
+        userAnswers.forEach((ua, idx) => {
+            if (ua === null) return;
+            const q = quiz[idx];
+            const chosen = q.options[ua] || '';
+            if (normalizeText(chosen) === normalizeText(q.answer)) s += 1;
+        });
+        return s + '/' + qCount;
+    }
+
+    prevBtn.addEventListener('click', ()=>{ if(index>0){ index--; render(); }});
+    nextBtn.addEventListener('click', ()=>{ if(index<qCount-1){ index++; render(); }});
+    resetBtn.addEventListener('click', ()=>{
+        for (let i=0;i<userAnswers.length;i++) userAnswers[i]=null;
+        index = 0; render();
+    });
+
+    render();
+
+})();
+</script>
+
+</body>
+</html>

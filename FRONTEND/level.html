@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate Quiz</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            color: white;
+        }
+
+        .card {
+    width: 100%;
+    max-width: 600px;
+    padding: 50px 45px;
+    border-radius: 25px;
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+    text-align: center;
+
+    display: flex;
+    flex-direction: column;
+    gap: 35px;   /* THIS PREVENTS OVERLAP */
+}
+        h1 {
+            margin-bottom: 35px;
+            background: linear-gradient(to right, #00f5ff, #00ffcc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Upload Box */
+        .upload-section {
+            margin-bottom: 40px;
+        }
+
+        .upload-box {
+            border: 2px dashed rgba(255,255,255,0.4);
+            padding: 30px;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .upload-box:hover {
+            border-color: #00ffcc;
+            background: rgba(255,255,255,0.05);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* Difficulty */
+        .difficulty-section {
+            margin-bottom: 40px;
+        }
+
+        .levels {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.level-btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 20px;
+    border: 2px solid #00ffcc;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+        .level-btn.active,
+        .level-btn:hover {
+            background: #00ffcc;
+            color: black;
+            transform: scale(1.05);
+        }
+
+        /* Generate Button */
+        .generate-btn {
+            padding: 14px 40px;
+            border-radius: 30px;
+            border: none;
+            background: linear-gradient(45deg, #00f5ff, #00ffcc);
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .generate-btn:hover {
+            transform: scale(1.08);
+            box-shadow: 0 0 20px #00ffcc;
+        }
+
+        .back {
+            display: block;
+            margin-top: 30px;
+            color: #00ffcc;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        @media (max-width: 480px) {
+            .levels {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="card">
+
+        <h1>Generate Quiz</h1>
+    
+        <div class="upload-section">
+            <label class="upload-box">
+                <span id="uploadText">📂 Click to Upload PDF or Image</span>
+                <input type="file" id="fileInput" accept=".pdf,.jpg,.png">
+            </label>
+        </div>
+    
+        <div class="difficulty-section">
+            <h3>Select Difficulty</h3>
+            <div class="levels">
+                <div class="level-btn active" onclick="selectLevel(this,'easy')">Easy</div>
+                <div class="level-btn" onclick="selectLevel(this,'medium')">Medium</div>
+                <div class="level-btn" onclick="selectLevel(this,'hard')">Hard</div>
+            </div>
+        </div>
+    
+        <button class="generate-btn" onclick="generateQuiz()">Generate Quiz</button>
+    
+        <div class="result" id="resultBox" style="display:none;"></div>
+    
+        <a href="option.html" class="back">⬅ Back</a>
+    
+    </div>
+<script>
+    let selectedLevel = "easy";
+    
+    function selectLevel(element, level) {
+        document.querySelectorAll(".level-btn").forEach(btn => btn.classList.remove("active"));
+        element.classList.add("active");
+        selectedLevel = level;
+    }
+    
+    const fileInput = document.getElementById("fileInput");
+    const uploadText = document.getElementById("uploadText");
+    
+    // When file changes, update text safely
+    fileInput.addEventListener("change", function () {
+        if (fileInput.files.length > 0) {
+            uploadText.textContent = "📄 " + fileInput.files[0].name;
+        }
+    });
+    
+    async function generateQuiz() {
+    const fileInput = document.getElementById("fileInput");
+
+    if (fileInput.files.length === 0) {
+        alert("Please upload a file.");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("pdf", fileInput.files[0]);
+
+    try {
+        const response = await fetch("http://127.0.0.1:5000/quiz", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+
+        // Store the generated questions using the same key quiz.html expects
+        localStorage.setItem("generatedQuiz", JSON.stringify(data.questions));
+        window.location.href = "quiz.html";
+
+    } catch (error) {
+        alert("Backend connection error.");
+        console.error(error);
+    }
+}
+    </script>
+</body>
+</html>
